@@ -1,0 +1,6 @@
+python-dotenv
+pandas
+selenium
+webdriver-manager
+schedule
+dotenv
