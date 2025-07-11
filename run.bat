@@ -30,6 +30,16 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 echo 가상 환경 활성화 완료.
 
+REM 필요한 패키지 설치
+echo 필요한 패키지를 설치 중입니다...
+pip install -r requirements.txt
+IF %ERRORLEVEL% NEQ 0 (
+    echo 패키지 설치 실패. requirements.txt 파일을 확인하거나 인터넷 연결 상태를 확인하세요.
+    pause
+    exit /b 1
+)
+echo 패키지 설치 완료.
+
 REM main.py 스크립트 실행
 echo main.py 실행 중...
 python main.py
