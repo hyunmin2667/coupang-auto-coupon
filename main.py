@@ -11,10 +11,10 @@ from coupang_lib.item_loader import load_vendor_items_from_csv
 from coupang_lib.logger import logger
 
 
-# --- 설정 가능한 상수 정의 (config.py로 이동을 고려) ---
+# --- 설정 가능한 상수 정의 (config.config.py로 이동을 고려) ---
 MAX_DEACTIVATION_RETRIES = 3
 MAX_STATUS_POLLING_ATTEMPTS = 10
-STATUS_POLLING_INTERVAL_SEC = 1
+STATUS_POLLING_INTERVAL_SEC = 2
 MAX_APPLY_RETRIES = 3
 APPLY_RETRY_DELAY_SEC = 5
 # ----------------------------------------------------
@@ -66,7 +66,7 @@ def _poll_status_for_requested_id(
         logger.debug(f"요청 ID {requested_id} 상태 아직 완료되지 않음. {sleep_interval_sec}초 후 재시도...")
         time.sleep(sleep_interval_sec)
         
-    logger.warning(f"⚠️ 요청 ID {requested_id}가 지정된 {max_attempts}회 시도 내에 완료되지 않았습니다.")
+    logger.warning(f"[경고] 요청 ID {requested_id}가 지정된 {max_attempts}회 시도 내에 완료되지 않았습니다.")
     return None
 
 
@@ -93,7 +93,7 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
         accurate_coupon_name = coupon.get('promotionName', '이름 없음')
         
         if not coupon_id:
-            logger.warning(f"❌ 쿠폰 비활성화 시도 실패: 쿠폰 ID를 찾을 수 없음 (이름: {accurate_coupon_name}).")
+            logger.warning(f"[실패] 쿠폰 비활성화 시도 실패: 쿠폰 ID를 찾을 수 없음 (이름: {accurate_coupon_name}).")
             continue
 
         # 비활성화 요청
@@ -101,7 +101,7 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
         deactivation_requested_id = deactivate_coupon(api_client_instance, vendor_id, coupon_id, accurate_coupon_name)
         
         if not deactivation_requested_id:
-            logger.warning(f"❌ 쿠폰 {coupon_id} 비활성화 요청 실패 또는 Requested ID를 받지 못했습니다.")
+            logger.warning(f"[실패] 쿠폰 {coupon_id} 비활성화 요청 실패 또는 Requested ID를 받지 못했습니다.")
             continue
         
         # 비활성화 상태 폴링
@@ -115,9 +115,9 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
         
         if poll_result is not None: # DONE 상태 (coupon_id가 반환됨)
             successfully_deactivated_count += 1
-            logger.info(f"✅ 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id}) 완료.")
+            logger.info(f"[성공] 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id}) 완료.")
         else:
-            logger.warning(f"⚠️ 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id})이 지정된 시간 내에 완료되지 않았거나 실패했습니다.")
+            logger.warning(f"[경고] 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id})이 지정된 시간 내에 완료되지 않았거나 실패했습니다.")
 
     logger.info(f"API로 총 {total_coupons_to_deactivate}개 '자동쿠폰_' 쿠폰 중 {successfully_deactivated_count}개 비활성화 완료.")
     return successfully_deactivated_count == total_coupons_to_deactivate # 모든 쿠폰이 성공적으로 비활성화 요청되고, 그 상태 확인까지 완료되었는지 여부
@@ -134,12 +134,12 @@ def _handle_deactivation_phase(api_client_instance: CoupangApiClient, vendor_id:
         logger.info(f"기존 쿠폰 비활성화 시도 중... (시도 {attempt + 1}/{MAX_DEACTIVATION_RETRIES})")
         # get_and_deactivate_auto_coupons_request 함수가 이제 내부에서 개별 쿠폰의 폴링까지 처리
         if get_and_deactivate_auto_coupons_request(api_client_instance, vendor_id):
-            logger.info("✅ 기존 쿠폰 비활성화 프로세스 완료.")
+            logger.info("[성공] 기존 쿠폰 비활성화 프로세스 완료.")
             return True
         else:
-            logger.warning(f"❌ 기존 쿠폰 비활성화 실패 (시도 {attempt + 1}/{MAX_DEACTIVATION_RETRIES}). {APPLY_RETRY_DELAY_SEC}초 후 재시도...")
+            logger.warning(f"[실패] 기존 쿠폰 비활성화 실패 (시도 {attempt + 1}/{MAX_DEACTIVATION_RETRIES}). {APPLY_RETRY_DELAY_SEC}초 후 재시도...")
             time.sleep(APPLY_RETRY_DELAY_SEC)
-    logger.error("⚠️ 기존 쿠폰 비활성화가 반복 실패하여 다음 단계로 진행하지 않습니다.")
+    logger.error("[오류] 기존 쿠폰 비활성화가 반복 실패하여 다음 단계로 진행하지 않습니다.")
     return False
 
 def _create_and_poll_coupon(api_client_instance: CoupangApiClient, vendor_id: str) -> int | None:
@@ -165,7 +165,7 @@ def _create_and_poll_coupon(api_client_instance: CoupangApiClient, vendor_id: st
     )
     
     if coupon_id is None:
-        logger.warning("지정된 시간 내에 쿠폰 생성이 완료되지 않았습니다.")
+        logger.warning("[경고] 지정된 시간 내에 쿠폰 생성이 완료되지 않았습니다.")
     return coupon_id
 
 
@@ -188,18 +188,18 @@ def _apply_coupon_with_retries(api_client_instance: CoupangApiClient, coupon_id:
             )
             
             if poll_result is not None: # DONE 상태 (coupon_id가 반환됨)
-                logger.info("✅ 쿠폰 적용 완료!")
+                logger.info("[성공] 쿠폰 적용 완료!")
                 return True
             else:
-                logger.warning(f"⚠️ 쿠폰 {coupon_id} 품목 적용 요청 ({apply_requested_id})이 지정된 시간 내에 완료되지 않았거나 실패했습니다.")
+                logger.warning(f"[경고] 쿠폰 {coupon_id} 품목 적용 요청 ({apply_requested_id})이 지정된 시간 내에 완료되지 않았거나 실패했습니다.")
         else:
-            logger.warning(f"❌ 쿠폰 {coupon_id} 품목 적용 요청 실패 또는 Requested ID를 받지 못했습니다.")
+            logger.warning(f"[실패] 쿠폰 {coupon_id} 품목 적용 요청 실패 또는 Requested ID를 받지 못했습니다.")
 
         if (attempt_apply + 1) < MAX_APPLY_RETRIES: # 아직 성공 못했고 재시도 기회가 남았다면
-            logger.warning(f"❌ 쿠폰 {coupon_id} 품목 적용 실패 (시도 {attempt_apply + 1}/{MAX_APPLY_RETRIES}). {APPLY_RETRY_DELAY_SEC}초 후 재시도...")
+            logger.warning(f"[실패] 쿠폰 {coupon_id} 품목 적용 실패 (시도 {attempt_apply + 1}/{MAX_APPLY_RETRIES}). {APPLY_RETRY_DELAY_SEC}초 후 재시도...")
             time.sleep(APPLY_RETRY_DELAY_SEC) # 재시도 전 딜레이
     
-    logger.error(f"⚠️ 쿠폰 {coupon_id} 품목 적용이 반복 실패하여 다음 사이클까지 기다립니다.")
+    logger.error(f"[오류] 쿠폰 {coupon_id} 품목 적용이 반복 실패하여 다음 사이클까지 기다립니다.")
     return False # 최종 적용 실패
 
 
@@ -212,7 +212,7 @@ def run_coupon_cycle():
     logger.info("\n--- 쿠폰 자동화: 새로운 쿠폰 갱신 사이클 시작 ---")
 
     if not VENDOR_ITEMS:
-        logger.warning("VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜕니다.")
+        logger.warning("[경고] VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜕니다.")
         return
 
     # 1. 기존 쿠폰 비활성화 단계 처리
@@ -224,7 +224,7 @@ def run_coupon_cycle():
     coupon_id = _create_and_poll_coupon(api_client, VENDOR_ID)
     if not coupon_id:
         # 쿠폰 생성 실패 시 전체 사이클 중단
-        logger.error("⚠️ 쿠폰 생성이 반복 실패하여 다음 단계로 진행하지 않습니다.")
+        logger.error("[오류] 쿠폰 생성이 반복 실패하여 다음 단계로 진행하지 않습니다.")
         return
 
     # 쿠폰 상태 반영 후 적용 전 대기 (쿠폰 생성 후 적용 가능 상태까지 대기)

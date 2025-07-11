@@ -1,4 +1,3 @@
-# coupang_lib/coupang_api_utils.py
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
@@ -31,13 +30,13 @@ def get_active_coupons_by_keyword(api_client_instance: CoupangApiClient, vendor_
                 c for c in all_active_coupons
                 if c.get('promotionName') and keyword in c['promotionName']
             ]
-            logger.info(f"✅ 활성 쿠폰 목록 조회 성공. '{keyword}' 포함 쿠폰 {len(filtered_coupons)}개 발견.")
+            logger.info(f"[성공] 활성 쿠폰 목록 조회 성공. '{keyword}' 포함 쿠폰 {len(filtered_coupons)}개 발견.")
             return filtered_coupons
         else:
-            logger.warning(f"❌ 활성 쿠폰 목록 조회 실패: {coupons_res.get('message', '알 수 없는 오류')}")
+            logger.warning(f"[실패] 활성 쿠폰 목록 조회 실패: {coupons_res.get('message', '알 수 없는 오류')}")
             return []
     except Exception as e:
-        logger.error(f"❌ 활성 쿠폰 목록 조회 중 오류 발생: {e}", exc_info=True)
+        logger.error(f"[실패] 활성 쿠폰 목록 조회 중 오류 발생: {e}", exc_info=True)
         return []
 
 def deactivate_coupon(api_client_instance: CoupangApiClient, vendor_id: str, coupon_id: int, coupon_name: str = "알 수 없는 쿠폰") -> str | None: # 반환 타입 변경: bool -> str | None
@@ -56,16 +55,16 @@ def deactivate_coupon(api_client_instance: CoupangApiClient, vendor_id: str, cou
         if deactivate_res.get('code') == 200 and deactivate_res.get('data') and deactivate_res['data'].get('content'):
             requested_id = deactivate_res['data']['content'].get('requestedId') # requestedId 추출
             if requested_id:
-                logger.info(f"✅ 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 요청 완료. Requested ID: {requested_id}")
+                logger.info(f"[성공] 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 요청 완료. Requested ID: {requested_id}")
                 return requested_id # 성공 시 requestedId 반환
             else:
-                logger.warning(f"❌ 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 요청 성공했으나 Requested ID 없음: {deactivate_res}")
+                logger.warning(f"[주의] 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 요청 성공했으나 Requested ID 없음: {deactivate_res}")
                 return None # requestedId 없으면 None 반환
         else:
-            logger.warning(f"❌ 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 요청 실패: {deactivate_res.get('message', '알 수 없는 오류')}")
+            logger.warning(f"[실패] 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 요청 실패: {deactivate_res.get('message', '알 수 없는 오류')}")
             return None # 실패 시 None 반환
     except Exception as e:
-        logger.error(f"❌ 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 중 오류: {e}", exc_info=True)
+        logger.error(f"[실패] 쿠폰 {coupon_id} (이름: '{coupon_name}') 비활성화 중 오류: {e}", exc_info=True)
         return None # 예외 발생 시 None 반환
 
 
@@ -100,13 +99,13 @@ def create_new_coupon_util(api_client_instance: CoupangApiClient, vendor_id: str
         res = api_client_instance.post(path_without_query, body)
         if res.get('data', {}).get('success'):
             requested_id = res['data']['content']['requestedId']
-            logger.info(f"✅ 쿠폰 생성 요청 완료 (Requested ID: {requested_id})")
+            logger.info(f"[성공] 쿠폰 생성 요청 완료 (Requested ID: {requested_id})")
             return requested_id
         else:
-            logger.warning(f"❌ 쿠폰 생성 API 응답 실패: {res.get('code', 'N/A')} - {res.get('message', '알 수 없는 오류')}")
+            logger.warning(f"[실패] 쿠폰 생성 API 응답 실패: {res.get('code', 'N/A')} - {res.get('message', '알 수 없는 오류')}")
             return None
     except Exception as e:
-        logger.error(f"❌ 쿠폰 생성 중 오류 발생: {e}", exc_info=True)
+        logger.error(f"[실패] 쿠폰 생성 중 오류 발생: {e}", exc_info=True)
         return None
 
 
@@ -146,23 +145,23 @@ def check_coupon_status_util(api_client_instance: CoupangApiClient, vendor_id: s
             total_count = content.get('total', 0)
 
             if status == "DONE":
-                logger.info(f"✅ 쿠폰 요청 {requested_id} (타입: {request_type}) 성공. 상태: DONE, 쿠폰 ID: {coupon_id}, 성공: {succeeded_count}/{total_count}")
+                logger.info(f"[성공] 쿠폰 요청 {requested_id} (타입: {request_type}) 성공. 상태: DONE, 쿠폰 ID: {coupon_id}, 성공: {succeeded_count}/{total_count}")
                 return coupon_id
             elif status == "FAIL":
                 fail_reason = content.get('reason', '상세 이유 없음')
                 error_message_from_data = res['data'].get('errorMessage', 'N/A')
-                logger.warning(f"❌ 쿠폰 요청 {requested_id} (타입: {request_type}) 실패. 상태: FAIL, 실패 개수: {failed_count}/{total_count}, 이유: {fail_reason}, API응답 오류메시지: {error_message_from_data}")
+                logger.warning(f"[실패] 쿠폰 요청 {requested_id} (타입: {request_type}) 실패. 상태: FAIL, 실패 개수: {failed_count}/{total_count}, 이유: {fail_reason}, API응답 오류메시지: {error_message_from_data}")
                 return None
             else: # status is REQUESTED or other unexpected status
-                logger.info(f"🔄 쿠폰 요청 {requested_id} (타입: {request_type}) 진행 중. 현재 상태: {status}")
+                logger.info(f"[확인중] 쿠폰 요청 {requested_id} (타입: {request_type}) 진행 중. 현재 상태: {status}")
                 return None
         else:
             error_message_from_res = res.get('message', '알 수 없는 오류')
             error_details_from_data = res.get('data', {}).get('errorMessage', '')
-            logger.warning(f"❌ 쿠폰 요청 {requested_id} 상태 조회 실패. API 응답 코드: {res.get('code', 'N/A')}, 메시지: {error_message_from_res}, 상세: {error_details_from_data}")
+            logger.warning(f"[실패] 쿠폰 요청 {requested_id} 상태 조회 실패. API 응답 코드: {res.get('code', 'N/A')}, 메시지: {error_message_from_res}, 상세: {error_details_from_data}")
             return None
     except Exception as e:
-        logger.error(f"❌ 쿠폰 요청 {requested_id} 상태 조회 중 예외 발생: {e}", exc_info=True)
+        logger.error(f"[실패] 쿠폰 요청 {requested_id} 상태 조회 중 예외 발생: {e}", exc_info=True)
         return None
 
 
@@ -173,7 +172,7 @@ def apply_coupon_to_items_util(api_client_instance: CoupangApiClient, vendor_id:
     logger.info(f"[API 적용] 쿠폰 {coupon_id}를 {len(vendor_items)}개 품목에 적용 시도 중...")
 
     if not vendor_items:
-        logger.warning("적용할 VENDOR_ITEMS가 없어 쿠폰 적용을 건너뜕니다.")
+        logger.warning("적용할 VENDOR_ITEMS가 없어 쿠폰 적용을 건너뛰니다.")
         return None
 
     path_without_query = f"/v2/providers/fms/apis/api/v1/vendors/{vendor_id}/coupons/{coupon_id}/items"
@@ -184,14 +183,14 @@ def apply_coupon_to_items_util(api_client_instance: CoupangApiClient, vendor_id:
         if res.get('data', {}).get('success'):
             requested_id = res['data']['content'].get('requestedId') # requestedId 추출
             if requested_id:
-                logger.info(f"✅ 쿠폰 {coupon_id} 품목 적용 요청 완료. Requested ID: {requested_id}")
+                logger.info(f"[성공] 쿠폰 {coupon_id} 품목 적용 요청 완료. Requested ID: {requested_id}")
                 return requested_id # 성공 시 requestedId 반환
             else:
-                logger.warning(f"❌ 쿠폰 {coupon_id} 품목 적용 요청 성공했으나 Requested ID 없음: {res}")
+                logger.warning(f"[주의] 쿠폰 {coupon_id} 품목 적용 요청 성공했으나 Requested ID 없음: {res}")
                 return None # requestedId 없으면 None 반환
         else:
-            logger.warning(f"❌ 쿠폰 {coupon_id} 품목 적용 API 응답 실패: {res}")
+            logger.warning(f"[실패] 쿠폰 {coupon_id} 품목 적용 API 응답 실패: {res}")
             return None # 실패 시 None 반환
     except Exception as e:
-        logger.error(f"❌ 쿠폰 {coupon_id} 품목 적용 중 오류 발생: {e}", exc_info=True)
-        return None # 예외 발생 시 None 반환
+        logger.error(f"[실패] 쿠폰 {coupon_id} 품목 적용 중 오류 발생: {e}", exc_info=True)
+        return None

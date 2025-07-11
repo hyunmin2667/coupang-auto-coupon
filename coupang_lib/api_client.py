@@ -48,14 +48,15 @@ class CoupangApiClient:
         }
         req_body = json.dumps(body).encode('utf-8') if body else None
         
-        logger.info(f"\n--- API 요청 상세 ({method} {path_without_query}) ---")
-        logger.info(f"요청 URL: {full_url}")
-        logger.info(f"요청 메소드: {method}")
-        logger.info(f"요청 헤더 Authorization: {headers['Authorization']}")
+        # 변경: API 요청 상세 로그를 DEBUG 레벨로 변경
+        logger.debug(f"\n--- API 요청 상세 ({method} {path_without_query}) ---")
+        logger.debug(f"요청 URL: {full_url}")
+        logger.debug(f"요청 메소드: {method}")
+        logger.debug(f"요청 헤더 Authorization: {headers['Authorization']}") # 민감 정보이므로 DEBUG로
         if req_body:
             # 바디가 있을 경우에만 로깅 (POST/PUT 등에 해당)
-            logger.info(f"요청 바디: {json.dumps(body, indent=2, ensure_ascii=False)}")
-        logger.info("---------------------------------------------")
+            logger.debug(f"요청 바디: {json.dumps(body, indent=2, ensure_ascii=False)}") # 상세 정보이므로 DEBUG로
+        logger.debug("---------------------------------------------")
         
         try:
             req = urllib.request.Request(full_url, data=req_body, headers=headers, method=method) if req_body else urllib.request.Request(full_url, headers=headers, method=method)
@@ -88,10 +89,11 @@ class CoupangApiClient:
 
                 res = json.loads(response_body)
                 
-                logger.info(f"\n--- API 응답 ({method} {path_without_query}) ---")
-                logger.info(f"HTTP 상태 코드: {resp.getcode()}")
-                logger.info(f"응답 본문: {json.dumps(res, indent=2, ensure_ascii=False)}")
-                logger.info("--------------------")
+                # 변경: API 응답 상세 로그를 DEBUG 레벨로 변경
+                logger.debug(f"\n--- API 응답 ({method} {path_without_query}) ---")
+                logger.debug(f"HTTP 상태 코드: {resp.getcode()}")
+                logger.debug(f"응답 본문: {json.dumps(res, indent=2, ensure_ascii=False)}") # 상세 정보이므로 DEBUG로
+                logger.debug("--------------------")
                 return res
         except urllib.error.HTTPError as e:
             error_response_body = e.read()
@@ -110,22 +112,22 @@ class CoupangApiClient:
                 error_response_text = error_response_body.decode('latin-1', errors='ignore')
                 logger.error(f"ERROR: 오류 응답 본문 디코딩 중 예상치 못한 오류: {decode_e}")
 
-            logger.error(f"\n❌ HTTP 오류: {e.code} - {e.reason}")
+            logger.error(f"\n[실패] HTTP 오류: {e.code} - {e.reason}")
             logger.error(f"오류 응답 본문: {error_response_text}")
             raise
         except urllib.error.URLError as e:
-            logger.error(f"\n❌ URL 오류: {e.reason}")
+            logger.error(f"\n[실패] URL 오류: {e.reason}")
             logger.error("네트워크 연결 또는 방화벽 문제일 수 있습니다.")
             raise
         except json.JSONDecodeError as e:
-            logger.error(f"\n❌ JSON 디코딩 오류: {e}")
+            logger.error(f"\n[실패] JSON 디코딩 오류: {e}")
             try:
                 logger.error(f"응답을 파싱할 수 없습니다. 수신된 본문: {response_body[:500]}...")
             except NameError:
                 logger.error("응답 본문을 가져올 수 없어 파싱할 수 없습니다.")
             raise
         except Exception as e:
-            logger.error(f"\n❌ 예상치 못한 오류가 발생했습니다: {e}")
+            logger.error(f"\n[실패] 예상치 못한 오류가 발생했습니다: {e}")
             raise
 
     # 래핑된 HTTP 메서드 수정 (인자 전달 방식 개선)
