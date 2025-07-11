@@ -268,8 +268,7 @@ def run_coupon_cycle():
         if cycle_success:
             send_discord_notification(notification_message, f"{notification_subject} (성공)")
         else:
-            failure_message_with_mention = f"@everyone {notification_message}"
-            send_discord_notification(failure_message_with_mention, f"{notification_subject} (실패)")
+            send_discord_notification(notification_message, f"{notification_subject} (실패) @everyone")
 
 
 # 자동 실행 설정
