@@ -21,6 +21,9 @@ API_GATEWAY_URL = "https://api-gateway.coupang.com"
 SELENIUM_HEADLESS = True
 SELENIUM_WINDOW_SIZE = "1920,1080"
 
+# DISCORD Webhook 설정
+WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+
 # --- 추가된 쿠폰 및 스케줄 설정 ---
 # getenv로 값을 가져올 때, 정수형으로 변환하고 기본값을 설정하여 안전성을 높입니다.
 # .env 파일에 값이 없거나 잘못된 형식일 경우를 대비합니다.

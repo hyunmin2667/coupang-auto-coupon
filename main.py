@@ -3,12 +3,14 @@
 import time
 import schedule
 from typing import Callable, Any
+import traceback # 상세한 오류 정보를 얻기 위해 추가
 
 from coupang_lib.config import VENDOR_ID, COUPON_CYCLE_MINUTES, API_GATEWAY_URL, ACCESS_KEY, SECRET_KEY
 from coupang_lib.api_client import CoupangApiClient
 from coupang_lib.coupang_api_utils import create_new_coupon_util, check_coupon_status_util, apply_coupon_to_items_util, get_active_coupons_by_keyword, deactivate_coupon
 from coupang_lib.item_loader import load_vendor_items_from_csv
 from coupang_lib.logger import logger
+from coupang_lib.discord_notifier import send_discord_notification
 
 
 # --- 설정 가능한 상수 정의 (config.config.py로 이동을 고려) ---
@@ -208,33 +210,65 @@ def run_coupon_cycle():
     """
     쿠폰 자동화의 전체 사이클을 실행합니다.
     기존 자동 생성 쿠폰 비활성화, 새 쿠폰 생성, 상태 확인 및 품목 적용을 포함합니다.
+    최종 성공 또는 실패 여부를 Discord 알림으로 보냅니다.
     """
     logger.info("\n--- 쿠폰 자동화: 새로운 쿠폰 갱신 사이클 시작 ---")
+    cycle_success = True  # 사이클 전체 성공 여부 플래그
+    notification_message = ""
+    notification_subject = "쿠폰 자동화 스크립트 알림"
 
-    if not VENDOR_ITEMS:
-        logger.warning("[경고] VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜕니다.")
-        return
+    try:
+        if not VENDOR_ITEMS:
+            notification_message = "[경고] VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜁니다."
+            logger.warning(notification_message)
+            cycle_success = False
+            return # 함수 종료 (finally 블록에서 알림 처리)
 
-    # 1. 기존 쿠폰 비활성화 단계 처리
-    if not _handle_deactivation_phase(api_client, VENDOR_ID):
-        # 비활성화 단계 실패 시 전체 사이클 중단
-        return
+        # 1. 기존 쿠폰 비활성화 단계 처리
+        if not _handle_deactivation_phase(api_client, VENDOR_ID):
+            notification_message = "[오류] 기존 쿠폰 비활성화 단계 실패. 다음 단계로 진행하지 않습니다."
+            logger.error(notification_message)
+            cycle_success = False
+            return
 
-    # 2. 새 쿠폰 생성 및 상태 확인 단계 처리
-    coupon_id = _create_and_poll_coupon(api_client, VENDOR_ID)
-    if not coupon_id:
-        # 쿠폰 생성 실패 시 전체 사이클 중단
-        logger.error("[오류] 쿠폰 생성이 반복 실패하여 다음 단계로 진행하지 않습니다.")
-        return
+        # 2. 새 쿠폰 생성 및 상태 확인 단계 처리
+        coupon_id = _create_and_poll_coupon(api_client, VENDOR_ID)
+        if not coupon_id:
+            notification_message = "[오류] 새 쿠폰 생성 단계 실패. 다음 단계로 진행하지 않습니다."
+            logger.error(notification_message)
+            cycle_success = False
+            return
 
-    # 쿠폰 상태 반영 후 적용 전 대기 (쿠폰 생성 후 적용 가능 상태까지 대기)
-    time.sleep(STATUS_POLLING_INTERVAL_SEC)
-    logger.info(f"쿠폰 상태 확인 후 {STATUS_POLLING_INTERVAL_SEC}초 대기 중...")
+        # 쿠폰 상태 반영 후 적용 전 대기
+        time.sleep(STATUS_POLLING_INTERVAL_SEC)
+        logger.info(f"쿠폰 상태 확인 후 {STATUS_POLLING_INTERVAL_SEC}초 대기 중...")
 
-    # 3. 쿠폰 품목 적용 단계 처리
-    _apply_coupon_with_retries(api_client, coupon_id, VENDOR_ITEMS) # 반환 값 사용 안 함 (로깅으로 충분)
-    
-    logger.info("--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 ---")
+        # 3. 쿠폰 품목 적용 단계 처리
+        if not _apply_coupon_with_retries(api_client, coupon_id, VENDOR_ITEMS):
+            notification_message = "[오류] 쿠폰 품목 적용 단계 실패."
+            logger.error(notification_message)
+            cycle_success = False
+            return
+
+        # 모든 단계 성공 시
+        notification_message = "쿠폰 자동화 사이클이 성공적으로 완료되었습니다."
+        logger.info("--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 (성공) ---")
+        cycle_success = True # 명시적으로 성공 상태 설정
+
+    except Exception as e:
+        # 예상치 못한 다른 모든 오류 처리
+        error_details = traceback.format_exc()
+        notification_message = f"[치명적 오류] 쿠폰 자동화 사이클 실행 중 예상치 못한 오류 발생: {e}\n\n상세 정보:\n```{error_details}```"
+        notification_subject = "긴급 알림: 쿠폰 자동화 스크립트 치명적 오류"
+        logger.critical(notification_message)
+        cycle_success = False
+
+    finally:
+        # 최종 성공/실패 여부에 따라 Discord 알림 전송
+        if cycle_success:
+            send_discord_notification(notification_message, f"{notification_subject} (성공)")
+        else:
+            send_discord_notification(notification_message, f"{notification_subject} (실패)")
 
 
 # 자동 실행 설정
@@ -242,7 +276,9 @@ if __name__ == "__main__":
     logger.info(f"쿠폰 자동화 시작: {COUPON_CYCLE_MINUTES}분마다 쿠폰 갱신 실행 대기 중")
 
     run_coupon_cycle() # 최초 1회 실행
-    schedule.every(COUPON_CYCLE_MINUTES).minutes.do(run_coupon_cycle) # .env에서 설정한 사이클 시간 적용
+
+    schedule.every(COUPON_CYCLE_MINUTES).minutes.do(run_coupon_cycle)
+
     while True:
-        schedule.run_pending() # 예약된 작업을 확인하고 실행
-        time.sleep(10) # CPU 부하를 줄이기 위해 10초 대기
+        schedule.run_pending()
+        time.sleep(10)
