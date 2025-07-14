@@ -16,7 +16,7 @@ from coupang_lib.discord_notifier import send_discord_notification
 # --- 설정 가능한 상수 정의 (config.config.py로 이동을 고려) ---
 MAX_DEACTIVATION_RETRIES = 3
 MAX_STATUS_POLLING_ATTEMPTS = 10
-STATUS_POLLING_INTERVAL_SEC = 2
+STATUS_POLLING_INTERVAL_SEC = 5
 MAX_APPLY_RETRIES = 3
 APPLY_RETRY_DELAY_SEC = 5
 # ----------------------------------------------------

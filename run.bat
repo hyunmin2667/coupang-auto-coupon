@@ -46,4 +46,6 @@ python main.py
 
 echo.
 echo 스크립트 실행이 완료되었습니다.
+echo.
+echo *만약 정상적으로 동작하지 않았다면, 스크립트를 다시 실행해보세요.*
 pause
