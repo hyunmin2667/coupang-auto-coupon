@@ -1,0 +1,32 @@
+# .gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+.Python/
+build/
+dist/
+*.egg-info/
+.env
+.venv/
+venv/
+env/
+
+# Logs
+logs/
+*.log
+
+# Editor/IDE specific files
+.idea/             # IntelliJ / PyCharm
+.vscode/           # VS Code
+*.sublime-project
+*.sublime-workspace
+
+# 테스트 관련 파일 (test.py가 임시 파일인 경우)
+# test.py가 실제 테스트 스위트의 일부라면 제외하지 않습니다.
+test.py
+
+# 오류 발생 시 생성되는 스크린샷
+*.png
