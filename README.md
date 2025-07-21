@@ -2,7 +2,7 @@
 
 이 프로그램은 쿠팡 판매자 센터(WING)의 쿠폰을 **자동으로 관리**해주는 편리한 도구입니다. 기존에 만들어진 특정 쿠폰을 비활성화하고, 새로운 쿠폰을 만들어서 미리 정해둔 상품들에 자동으로 적용해줍니다. 모든 과정은 기록되며, 설정한 디스코드 채널로 알림까지 받을 수 있습니다.
 
-## 🚀 프로그램을 시작하는 가장 쉬운 방법 (비개발자용)
+## 🚀 프로그램을 시작하는 방법
 
 이 프로그램을 컴퓨터에서 작동시키려면 몇 가지 간단한 준비 과정이 필요합니다. 아래 단계를 순서대로 따라해 보세요.
 
@@ -11,7 +11,7 @@
 먼저, 이 프로그램을 컴퓨터로 다운로드해야 합니다. 아래 명령어를 **복사하여 터미널(또는 명령 프롬프트)에 붙여넣고 엔터**를 누르세요.
 
 ```bash
-git clone [https://github.com/hyunmin2667/coupang-auto-coupon.git](https://github.com/hyunmin2667/coupang-auto-coupon.git)
+git clone https://github.com/hyunmin2667/coupang-auto-coupon.git
 cd coupang-auto-coupon
 ```
 
