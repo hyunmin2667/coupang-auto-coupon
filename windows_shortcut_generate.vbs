@@ -1,80 +1,77 @@
 Set WshShell = WScript.CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-' ï¿½ï¿½ ï¿½ï¿½Å©ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ä¸® (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ù±ï¿½ ï¿½ï¿½ï¿½ï¿½)
+' ÀÌ ½ºÅ©¸³Æ®°¡ ½ÇÇàµÇ´Â ÇöÀç µð·ºÅä¸® (ÇÁ·ÎÁ§Æ®ÀÇ °¡Àå ¹Ù±ù Æú´õ)
 strProjectRoot = WshShell.CurrentDirectory
 
-' ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-strShortcutFolderName = "ï¿½Ù·Î°ï¿½ï¿½ï¿½"
+' ¹Ù·Î°¡±â Æú´õ °æ·Î ¼³Á¤
+strShortcutFolderName = "¹Ù·Î°¡±â"
 strShortcutFolderPath = strProjectRoot & "\" & strShortcutFolderName
 
-' 1. "ï¿½Ù·Î°ï¿½ï¿½ï¿½" ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½Ì¹ï¿½ ï¿½Ö´Ù¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+' 1. "¹Ù·Î°¡±â" Æú´õ »ý¼º (ÀÌ¹Ì ÀÖ´Ù¸é ¸¸µéÁö ¾ÊÀ½)
 If Not fso.FolderExists(strShortcutFolderPath) Then
     fso.CreateFolder strShortcutFolderPath
-    WScript.Echo "'" & strShortcutFolderName & "' ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ï´ï¿½: " & strShortcutFolderPath
+    WScript.Echo "'" & strShortcutFolderName & "' Æú´õ°¡ »ý¼ºµÇ¾ú½À´Ï´Ù: " & strShortcutFolderPath
 Else
-    WScript.Echo "'" & strShortcutFolderName & "' ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½: " & strShortcutFolderPath
+    WScript.Echo "'" & strShortcutFolderName & "' Æú´õ°¡ ÀÌ¹Ì Á¸ÀçÇÕ´Ï´Ù: " & strShortcutFolderPath
 End If
 
-' ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½: {ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï¸ï¿½, ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½}
+' »ý¼ºÇÒ ¹Ù·Î°¡±â ¸ñ·Ï: {´ë»ó ÆÄÀÏ¸í, ¹Ù·Î°¡±â ÀÌ¸§}
 Dim arrShortcuts(3, 1)
 
 arrShortcuts(0, 0) = "windows_run.bat"
-arrShortcuts(0, 1) = "1.ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½.lnk"
+arrShortcuts(0, 1) = "1.½ÇÇàÇÏ±â.lnk"
 
 arrShortcuts(1, 0) = ".env"
-arrShortcuts(1, 1) = "2.ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.lnk"
+arrShortcuts(1, 1) = "2.¼³Á¤ÆíÁý.lnk"
 
 arrShortcuts(2, 0) = "vendor_items.csv"
-arrShortcuts(2, 1) = "3.ï¿½ï¿½Ç°ï¿½ï¿½ï¿½.lnk"
+arrShortcuts(2, 1) = "3.»óÇ°¸ñ·Ï.lnk"
 
 arrShortcuts(3, 0) = "windows_update.bat"
-arrShortcuts(3, 1) = "4.ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®.lnk"
+arrShortcuts(3, 1) = "4.¾÷µ¥ÀÌÆ®.lnk"
 
-' ï¿½ï¿½ ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+' °¢ ¹Ù·Î°¡±â »ý¼º
 For i = 0 To UBound(arrShortcuts, 1)
-    strTargetFile = arrShortcuts(i, 0) ' ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ (ï¿½ï¿½: windows_run.bat)
-    strShortcutName = arrShortcuts(i, 1) ' ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ (ï¿½ï¿½: 1.ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½.lnk)
+    strTargetFile = arrShortcuts(i, 0) ' ¿øº» ÆÄÀÏ ÀÌ¸§ (¿¹: windows_run.bat)
+    strShortcutName = arrShortcuts(i, 1) ' ¹Ù·Î°¡±â ÆÄÀÏ ÀÌ¸§ (¿¹: 1.½ÇÇàÇÏ±â.lnk)
 
-    strTargetFullPath = strProjectRoot & "\" & strTargetFile ' ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½
-    strShortcutFullPath = strShortcutFolderPath & "\" & strShortcutName ' ï¿½Ù·Î°ï¿½ï¿½â°¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½
+    strTargetFullPath = strProjectRoot & "\" & strTargetFile ' ¿øº» ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
+    strShortcutFullPath = strShortcutFolderPath & "\" & strShortcutName ' ¹Ù·Î°¡±â°¡ »ý¼ºµÉ ÀüÃ¼ °æ·Î
 
-    ' ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½ï¿½ ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-    If fso.FileExists(strTargetFullPath) Then
-        Set oShellLink = WshShell.CreateShortcut(strShortcutFullPath)
-        oShellLink.TargetPath = strTargetFullPath
-        oShellLink.WorkingDirectory = strProjectRoot ' ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Û¾ï¿½ ï¿½ï¿½ï¿½ä¸®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    ' *** ÆÄÀÏ Á¸Àç ¿©ºÎ È®ÀÎ ·ÎÁ÷ Á¦°Å: ÀÌÁ¦ ÆÄÀÏÀÌ ¾ø¾îµµ ¹Ù·Î°¡±â°¡ »ý¼ºµË´Ï´Ù. ***
 
-        ' ï¿½Ù·Î°ï¿½ï¿½â¿¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-        Select Case LCase(strTargetFile)
-            Case "windows_run.bat"
-                oShellLink.Description = "Coupang ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Î±×·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½."
-            Case ".env"
-                oShellLink.Description = "È¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï´ï¿½."
-            Case "vendor_items.csv"
-                oShellLink.Description = "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç° ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï´ï¿½."
-            Case "windows_update.bat"
-                oShellLink.Description = "Coupang ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Î±×·ï¿½ï¿½ï¿½ ï¿½Ö½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½Õ´Ï´ï¿½."
-        End Select
+    Set oShellLink = WshShell.CreateShortcut(strShortcutFullPath)
+    oShellLink.TargetPath = strTargetFullPath
+    oShellLink.WorkingDirectory = strProjectRoot ' ¹Ù·Î°¡±â ½ÇÇà ½Ã ÀÛ¾÷ µð·ºÅä¸®´Â ÇÁ·ÎÁ§Æ® ·çÆ®·Î ¼³Á¤
 
-        ' (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½) ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Â´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-        Select Case LCase(strTargetFile)
-            Case "windows_run.bat", "windows_update.bat"
-                oShellLink.IconLocation = "shell32.dll, 2" ' ï¿½Ï¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-            Case ".env"
-                oShellLink.IconLocation = "shell32.dll, 77" ' ï¿½Ø½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-            Case "vendor_items.csv"
-                oShellLink.IconLocation = "imageres.dll, 107" ' CSV/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (Excelï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½Ç¾ï¿½ ï¿½Ö´Ù¸ï¿½ Excel ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
-        End Select
+    ' ¹Ù·Î°¡±â¿¡ ´ëÇÑ ¼³¸í
+    Select Case LCase(strTargetFile)
+        Case "windows_run.bat"
+            oShellLink.Description = "Coupang ÀÚµ¿ ÄíÆù °ü¸® ÇÁ·Î±×·¥À» ½ÇÇàÇÕ´Ï´Ù."
+        Case ".env"
+            oShellLink.Description = "È¯°æ ¼³Á¤ ÆÄÀÏÀ» ¿±´Ï´Ù."
+        Case "vendor_items.csv"
+            oShellLink.Description = "ÄíÆù Àû¿ë »óÇ° ¸ñ·Ï ÆÄÀÏÀ» ¿±´Ï´Ù."
+        Case "windows_update.bat"
+            oShellLink.Description = "Coupang ÀÚµ¿ ÄíÆù °ü¸® ÇÁ·Î±×·¥À» ÃÖ½Å ¹öÀüÀ¸·Î ¾÷µ¥ÀÌÆ®ÇÕ´Ï´Ù."
+    End Select
 
-        oShellLink.Save
-        WScript.Echo "'" & strShortcutName & "' ï¿½Ù·Î°ï¿½ï¿½â°¡ ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ï´ï¿½."
-    Else
-        WScript.Echo "ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê½ï¿½ï¿½Ï´ï¿½ - " & strTargetFile & ". ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ù·Î°ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¾Ò½ï¿½ï¿½Ï´ï¿½."
-    End If
+    ' (¼±ÅÃ »çÇ×) ¹Ù·Î°¡±â ¾ÆÀÌÄÜ ¼³Á¤: ÆÄÀÏ Á¾·ù¿¡ ¸Â´Â ¾ÆÀÌÄÜ ÁöÁ¤
+    Select Case LCase(strTargetFile)
+        Case "windows_run.bat", "windows_update.bat"
+            oShellLink.IconLocation = "shell32.dll, 2" ' ÀÏ¹ÝÀûÀÎ ¹èÄ¡ ÆÄÀÏ ¾ÆÀÌÄÜ
+        Case ".env"
+            oShellLink.IconLocation = "shell32.dll, 77" ' ÅØ½ºÆ® ÆÄÀÏ ¾ÆÀÌÄÜ
+        Case "vendor_items.csv"
+            oShellLink.IconLocation = "imageres.dll, 107" ' CSV/½ºÇÁ·¹µå½ÃÆ® ¾ÆÀÌÄÜ (ExcelÀÌ ¼³Ä¡µÇ¾î ÀÖ´Ù¸é Excel ¾ÆÀÌÄÜÀÌ ³ª¿Ã ¼ö ÀÖÀ½)
+    End Select
+
+    oShellLink.Save
+    WScript.Echo "'" & strShortcutName & "' ¹Ù·Î°¡±â°¡ »ý¼ºµÇ¾ú½À´Ï´Ù."
 Next
 
-WScript.Echo "ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»ï¿½ï¿½ ï¿½Ù·Î°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½ï¿½ß½ï¿½ï¿½Ï´ï¿½. 'ï¿½Ù·Î°ï¿½ï¿½ï¿½' ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ï¿½ï¿½ï¿½Ö¼ï¿½ï¿½ï¿½."
+WScript.Echo "¸ðµç ¿äÃ»µÈ ¹Ù·Î°¡±â »ý¼ºÀ» ½ÃµµÇß½À´Ï´Ù. '¹Ù·Î°¡±â' Æú´õ¸¦ È®ÀÎÇØÁÖ¼¼¿ä."
 
 Set oShellLink = Nothing
 Set fso = Nothing
