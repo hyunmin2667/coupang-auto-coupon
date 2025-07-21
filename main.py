@@ -81,19 +81,24 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
 
     coupons_to_deactivate = get_active_coupons_by_keyword(api_client_instance, vendor_id, "자동쿠폰_")
 
-    if not coupons_to_deactivate:
+    if coupons_to_deactivate is None: # <-- 조회 자체에 실패한 경우 (None 반환)
+        logger.error("[실패] 활성 쿠폰 목록 조회 중 치명적인 오류가 발생하여 비활성화 프로세스를 진행할 수 없습니다.")
+        return False # <-- 명확히 실패로 처리
+
+    if not coupons_to_deactivate: # <-- 조회는 성공했으나 비활성화할 쿠폰이 없는 경우 (빈 리스트 반환)
         logger.info("API로 비활성화할 '자동쿠폰_' 쿠폰이 없습니다.")
-        return True
+        return True # <-- 이 경우는 성공으로 처리
 
     logger.info(f"API로 비활성화할 '자동쿠폰_' 쿠폰 {len(coupons_to_deactivate)}개 발견.")
 
-    successfully_deactivated_count = 0 
+    successfully_deactivated_count = 0
     total_coupons_to_deactivate = len(coupons_to_deactivate)
 
     for coupon in coupons_to_deactivate:
+        # ... (기존 비활성화 로직 유지) ...
         coupon_id = coupon.get('couponId')
         accurate_coupon_name = coupon.get('promotionName', '이름 없음')
-        
+
         if not coupon_id:
             logger.warning(f"[실패] 쿠폰 비활성화 시도 실패: 쿠폰 ID를 찾을 수 없음 (이름: {accurate_coupon_name}).")
             continue
@@ -101,20 +106,22 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
         # 비활성화 요청
         logger.info(f"쿠폰 {coupon_id} 비활성화 요청 중... (이름: '{accurate_coupon_name}')")
         deactivation_requested_id = deactivate_coupon(api_client_instance, vendor_id, coupon_id, accurate_coupon_name)
-        
+
         if not deactivation_requested_id:
             logger.warning(f"[실패] 쿠폰 {coupon_id} 비활성화 요청 실패 또는 Requested ID를 받지 못했습니다.")
+            # 비활성화 요청 자체에 실패했으므로 카운트하지 않고 다음 쿠폰으로 이동
+            # 이 경우 total_coupons_to_deactivate와 successfully_deactivated_count가 달라져 최종 False 반환에 기여
             continue
-        
+
         # 비활성화 상태 폴링
         poll_result = _poll_status_for_requested_id(
-            api_client_instance, 
-            vendor_id, 
-            deactivation_requested_id, 
-            MAX_STATUS_POLLING_ATTEMPTS, 
+            api_client_instance,
+            vendor_id,
+            deactivation_requested_id,
+            MAX_STATUS_POLLING_ATTEMPTS,
             STATUS_POLLING_INTERVAL_SEC
         )
-        
+
         if poll_result is not None: # DONE 상태 (coupon_id가 반환됨)
             successfully_deactivated_count += 1
             logger.info(f"[성공] 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id}) 완료.")
@@ -122,8 +129,8 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
             logger.warning(f"[경고] 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id})이 지정된 시간 내에 완료되지 않았거나 실패했습니다.")
 
     logger.info(f"API로 총 {total_coupons_to_deactivate}개 '자동쿠폰_' 쿠폰 중 {successfully_deactivated_count}개 비활성화 완료.")
-    return successfully_deactivated_count == total_coupons_to_deactivate # 모든 쿠폰이 성공적으로 비활성화 요청되고, 그 상태 확인까지 완료되었는지 여부
-
+    # 모든 쿠폰이 성공적으로 비활성화 요청되고, 그 상태 확인까지 완료되었는지 여부
+    return successfully_deactivated_count == total_coupons_to_deactivate
 
 # --- 리팩토링된 메인 사이클 헬퍼 함수들 ---
 

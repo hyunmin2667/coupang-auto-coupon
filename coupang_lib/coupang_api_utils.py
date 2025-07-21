@@ -6,9 +6,10 @@ from coupang_lib.api_client import CoupangApiClient
 from coupang_lib.config import VENDOR_ID, CONTRACT_ID, COUPON_DISCOUNT_RATE, COUPON_MAX_DISCOUNT_PRICE, COUPON_CYCLE_MINUTES
 
 
-def get_active_coupons_by_keyword(api_client_instance: CoupangApiClient, vendor_id: str, keyword: str) -> List[Dict[str, Any]]:
+def get_active_coupons_by_keyword(api_client_instance: CoupangApiClient, vendor_id: str, keyword: str) -> List[Dict[str, Any]] | None: # 반환 타입에 | None 추가
     """
     현재 활성화된 쿠폰 목록을 조회하고, 특정 키워드로 필터링하여 반환합니다.
+    API 호출 중 오류 발생 시 None을 반환합니다.
     """
     logger.info(f"[API 조회] 활성 쿠폰 목록 (키워드: '{keyword}') 조회 시도 중...")
 
@@ -21,7 +22,6 @@ def get_active_coupons_by_keyword(api_client_instance: CoupangApiClient, vendor_
     }
 
     try:
-        # get 메서드 호출 시 body=None 인자 제거 (수정 유지)
         coupons_res = api_client_instance.get(list_coupons_path, list_coupons_query_params)
 
         if coupons_res.get('code') == 200 and coupons_res.get('data') and coupons_res['data'].get('content'):
@@ -33,11 +33,12 @@ def get_active_coupons_by_keyword(api_client_instance: CoupangApiClient, vendor_
             logger.info(f"[성공] 활성 쿠폰 목록 조회 성공. '{keyword}' 포함 쿠폰 {len(filtered_coupons)}개 발견.")
             return filtered_coupons
         else:
+            # API 응답은 정상이나 내용이 없거나 예상과 다를 경우 (오류는 아님)
             logger.warning(f"[실패] 활성 쿠폰 목록 조회 실패: {coupons_res.get('message', '알 수 없는 오류')}")
-            return []
+            return [] # 데이터가 없음을 의미하는 빈 리스트 반환
     except Exception as e:
         logger.error(f"[실패] 활성 쿠폰 목록 조회 중 오류 발생: {e}", exc_info=True)
-        return []
+        return None # <-- API 호출 중 예외 발생 시 None 반환
 
 def deactivate_coupon(api_client_instance: CoupangApiClient, vendor_id: str, coupon_id: int, coupon_name: str = "알 수 없는 쿠폰") -> str | None: # 반환 타입 변경: bool -> str | None
     """
