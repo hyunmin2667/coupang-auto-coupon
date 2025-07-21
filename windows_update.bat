@@ -18,6 +18,7 @@ IF %ERRORLEVEL% NEQ 0 (
 ) ELSE (
     echo.
     echo [성공] 프로그램이 최신 버전으로 성공적으로 업데이트되었습니다!
+    echo [알림] 기존 프로그램을 종료 후 재실행 해주세요.
 )
 
 echo.
