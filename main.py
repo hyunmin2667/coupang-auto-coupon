@@ -1,22 +1,18 @@
-# main.py
-
 import time
 import schedule
-from typing import Callable, Any
-import traceback # 상세한 오류 정보를 얻기 위해 추가
+from typing import Callable, Any, Tuple
+import traceback
 
 from coupang_lib.config import VENDOR_ID, COUPON_CYCLE_MINUTES, API_GATEWAY_URL, ACCESS_KEY, SECRET_KEY
 from coupang_lib.api_client import CoupangApiClient
 from coupang_lib.coupang_api_utils import create_new_coupon_util, check_coupon_status_util, apply_coupon_to_items_util, get_active_coupons_by_keyword, deactivate_coupon
 from coupang_lib.item_loader import load_vendor_items_from_csv
 from coupang_lib.logger import logger
-from coupang_lib.discord_notifier import send_discord_notification
+from coupang_lib.discord_notifier import send_discord_success_notification, send_discord_failure_notification
 
 
 # --- 설정 가능한 상수 정의 (config.config.py로 이동을 고려) ---
 MAX_DEACTIVATION_RETRIES = 3
-MAX_STATUS_POLLING_ATTEMPTS = 10
-STATUS_POLLING_INTERVAL_SEC = 5
 MAX_APPLY_RETRIES = 3
 APPLY_RETRY_DELAY_SEC = 5
 # ----------------------------------------------------
@@ -45,31 +41,86 @@ def apply_coupon_to_items_request(coupon_id):
     return apply_coupon_to_items_util(api_client, VENDOR_ID, coupon_id, VENDOR_ITEMS)
 
 
-# --- 새로운 제네릭 폴링 헬퍼 함수 ---
+# 최대 폴링 시간 (초) 및 경고 임계값 설정
+MAX_POLLING_TIME_SEC = 3600  # 총 1시간 (60분)까지 폴링 시도
+NOTIFICATION_THRESHOLD_SEC = 900 # 15분 (900초) 이상 지연 시 경고 로깅
+
+
 def _poll_status_for_requested_id(
     api_client_instance: CoupangApiClient,
     vendor_id: str,
-    requested_id: str,
-    max_attempts: int,
-    sleep_interval_sec: int
-) -> Any | None:
+    requested_id: str
+) -> int | None:
     """
     requestedId에 대해 특정 상태가 될 때까지 API를 폴링합니다.
-    성공 시 해당 결과(예: couponId)를 반환하고, 실패 시 None을 반환합니다.
+    총 폴링 시간에 따라 대기 간격을 점진적으로 늘립니다.
+    성공적으로 'DONE' 상태가 되면 해당 couponId (int)를 반환하고,
+    그 외의 경우 (FAIL, ERROR, 또는 최대 폴링 시간 초과) None을 반환합니다.
     """
-    for attempt in range(max_attempts):
-        logger.info(f"요청 ID {requested_id} 상태 확인 중... (시도 {attempt + 1}/{max_attempts})")
-        # check_coupon_status_util은 DONE이면 coupon_id 반환, 아니면 None (FAIL, REQUESTED 포함)
-        poll_result = check_coupon_status_util(api_client_instance, vendor_id, requested_id)
+    start_time = time.monotonic()
+    attempt = 0
+    total_elapsed_time_sec = 0
+    
+    # 알림이 이미 한 번 발생했는지 추적하는 플래그
+    notification_sent = False 
+
+    while total_elapsed_time_sec < MAX_POLLING_TIME_SEC:
+        attempt += 1
         
-        if poll_result is not None: # DONE 상태 (coupon_id가 반환됨)
-            return poll_result
+        # 현재까지 경과된 시간에 따라 동적으로 대기 간격 결정
+        if total_elapsed_time_sec < 60: # 1분 미만: 5초 단위
+            sleep_interval_sec = 5
+        elif total_elapsed_time_sec < 5 * 60: # 1분 이상 5분 미만: 30초 단위
+            sleep_interval_sec = 30
+        elif total_elapsed_time_sec < 30 * 60: # 5분 이상 30분 미만: 1분 단위 (60초)
+            sleep_interval_sec = 60
+        else: # 30분 이상: 5분 단위 (300초)
+            sleep_interval_sec = 300 
         
-        logger.debug(f"요청 ID {requested_id} 상태 아직 완료되지 않음. {sleep_interval_sec}초 후 재시도...")
-        time.sleep(sleep_interval_sec)
+        logger.info(f"요청 ID {requested_id} 상태 확인 중... (시도 {attempt}, 경과 시간: {total_elapsed_time_sec:.0f}초, 다음 대기: {sleep_interval_sec}초)")
         
-    logger.warning(f"[경고] 요청 ID {requested_id}가 지정된 {max_attempts}회 시도 내에 완료되지 않았습니다.")
+        status, coupon_id = check_coupon_status_util(api_client_instance, vendor_id, requested_id)
+        
+        if status == "DONE":
+            logger.info(f"요청 ID {requested_id} 처리 완료. 쿠폰 ID: {coupon_id}")
+            return coupon_id
+        elif status == "FAIL" or status == "ERROR":
+            logger.error(f"요청 ID {requested_id} 처리 실패 또는 오류 발생. 폴링 중단.")
+            return None
+        
+        # REQUESTED 상태일 경우 대기 후 재시도
+        total_elapsed_time_sec = time.monotonic() - start_time
+        
+        # 특정 시간 이상 지연될 경우 상세 알림 로깅 및 Discord 알림 전송 (한 번만)
+        if total_elapsed_time_sec >= NOTIFICATION_THRESHOLD_SEC and not notification_sent:
+            alert_message = (
+                f"요청 ID '{requested_id}'의 쿠폰 처리가 "
+                f"{total_elapsed_time_sec:.0f}초 ({total_elapsed_time_sec / 60:.1f}분) 이상 지연 중입니다. "
+                "수동 확인이 필요할 수 있습니다."
+            )
+            logger.warning(f"[쿠폰 처리 지연 알림] {alert_message}")
+            send_discord_failure_notification(alert_message, "긴급 알림: 쿠폰 처리 지연")
+            notification_sent = True
+            
+        # MAX_POLLING_TIME_SEC에 도달하기 전에만 sleep
+        # 다음 대기 후에도 MAX_POLLING_TIME_SEC를 초과하지 않을 경우에만 sleep
+        if total_elapsed_time_sec + sleep_interval_sec < MAX_POLLING_TIME_SEC:
+            logger.debug(f"요청 ID {requested_id} 상태 아직 완료되지 않음 ({status}). {sleep_interval_sec}초 후 재시도...")
+            time.sleep(sleep_interval_sec)
+        else:
+            # 최대 시간 초과 직전 또는 초과 후에는 더 이상 대기하지 않고 루프를 종료
+            break # 루프를 빠져나와 최종 실패 메시지로 이동
+
+    # while 루프가 종료될 경우 (MAX_POLLING_TIME_SEC 초과했거나 break에 의해)
+    # 이때만 최종 실패 알림을 보냅니다.
+    alert_message = (
+        f"요청 ID '{requested_id}'의 쿠폰 처리가 "
+        f"지정된 최대 폴링 시간 ({MAX_POLLING_TIME_SEC}초, 약 {MAX_POLLING_TIME_SEC / 60:.0f}분) 내에 완료되지 않았습니다. 폴링을 중단합니다."
+    )
+    logger.warning(f"[쿠폰 처리 시간 초과] {alert_message}")
+    send_discord_failure_notification(alert_message, "긴급 알림: 쿠폰 처리 시간 초과")
     return None
+
 
 
 def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClient, vendor_id: str) -> bool:
@@ -81,13 +132,13 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
 
     coupons_to_deactivate = get_active_coupons_by_keyword(api_client_instance, vendor_id, "자동쿠폰_")
 
-    if coupons_to_deactivate is None: # <-- 조회 자체에 실패한 경우 (None 반환)
+    if coupons_to_deactivate is None:
         logger.error("[실패] 활성 쿠폰 목록 조회 중 치명적인 오류가 발생하여 비활성화 프로세스를 진행할 수 없습니다.")
-        return False # <-- 명확히 실패로 처리
+        return False
 
-    if not coupons_to_deactivate: # <-- 조회는 성공했으나 비활성화할 쿠폰이 없는 경우 (빈 리스트 반환)
+    if not coupons_to_deactivate:
         logger.info("API로 비활성화할 '자동쿠폰_' 쿠폰이 없습니다.")
-        return True # <-- 이 경우는 성공으로 처리
+        return True
 
     logger.info(f"API로 비활성화할 '자동쿠폰_' 쿠폰 {len(coupons_to_deactivate)}개 발견.")
 
@@ -95,7 +146,6 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
     total_coupons_to_deactivate = len(coupons_to_deactivate)
 
     for coupon in coupons_to_deactivate:
-        # ... (기존 비활성화 로직 유지) ...
         coupon_id = coupon.get('couponId')
         accurate_coupon_name = coupon.get('promotionName', '이름 없음')
 
@@ -103,36 +153,28 @@ def get_and_deactivate_auto_coupons_request(api_client_instance: CoupangApiClien
             logger.warning(f"[실패] 쿠폰 비활성화 시도 실패: 쿠폰 ID를 찾을 수 없음 (이름: {accurate_coupon_name}).")
             continue
 
-        # 비활성화 요청
         logger.info(f"쿠폰 {coupon_id} 비활성화 요청 중... (이름: '{accurate_coupon_name}')")
         deactivation_requested_id = deactivate_coupon(api_client_instance, vendor_id, coupon_id, accurate_coupon_name)
 
         if not deactivation_requested_id:
             logger.warning(f"[실패] 쿠폰 {coupon_id} 비활성화 요청 실패 또는 Requested ID를 받지 못했습니다.")
-            # 비활성화 요청 자체에 실패했으므로 카운트하지 않고 다음 쿠폰으로 이동
-            # 이 경우 total_coupons_to_deactivate와 successfully_deactivated_count가 달라져 최종 False 반환에 기여
             continue
 
-        # 비활성화 상태 폴링
         poll_result = _poll_status_for_requested_id(
             api_client_instance,
             vendor_id,
-            deactivation_requested_id,
-            MAX_STATUS_POLLING_ATTEMPTS,
-            STATUS_POLLING_INTERVAL_SEC
+            deactivation_requested_id
         )
 
-        if poll_result is not None: # DONE 상태 (coupon_id가 반환됨)
+        if poll_result is not None:
             successfully_deactivated_count += 1
             logger.info(f"[성공] 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id}) 완료.")
         else:
             logger.warning(f"[경고] 쿠폰 {coupon_id} 비활성화 요청 ({deactivation_requested_id})이 지정된 시간 내에 완료되지 않았거나 실패했습니다.")
 
     logger.info(f"API로 총 {total_coupons_to_deactivate}개 '자동쿠폰_' 쿠폰 중 {successfully_deactivated_count}개 비활성화 완료.")
-    # 모든 쿠폰이 성공적으로 비활성화 요청되고, 그 상태 확인까지 완료되었는지 여부
     return successfully_deactivated_count == total_coupons_to_deactivate
 
-# --- 리팩토링된 메인 사이클 헬퍼 함수들 ---
 
 def _handle_deactivation_phase(api_client_instance: CoupangApiClient, vendor_id: str) -> bool:
     """
@@ -141,7 +183,6 @@ def _handle_deactivation_phase(api_client_instance: CoupangApiClient, vendor_id:
     """
     for attempt in range(MAX_DEACTIVATION_RETRIES):
         logger.info(f"기존 쿠폰 비활성화 시도 중... (시도 {attempt + 1}/{MAX_DEACTIVATION_RETRIES})")
-        # get_and_deactivate_auto_coupons_request 함수가 이제 내부에서 개별 쿠폰의 폴링까지 처리
         if get_and_deactivate_auto_coupons_request(api_client_instance, vendor_id):
             logger.info("[성공] 기존 쿠폰 비활성화 프로세스 완료.")
             return True
@@ -155,22 +196,19 @@ def _create_and_poll_coupon(api_client_instance: CoupangApiClient, vendor_id: st
     """
     새로운 쿠폰을 생성하고, 생성 완료 상태를 폴링하여 쿠폰 ID를 반환합니다.
     """
-    requested_id = create_coupon_request() # 래퍼 함수 호출
+    requested_id = create_coupon_request()
     if not requested_id:
         logger.error("쿠폰 생성 요청 실패.")
         return None
 
     logger.info(f"쿠폰 생성 요청 완료. Requested ID: {requested_id}")
-    time.sleep(STATUS_POLLING_INTERVAL_SEC * 2) # 쿠폰 생성 후 서버 반영을 위한 대기 (기존 2초 유지)
-    logger.info(f"쿠폰 생성 후 {STATUS_POLLING_INTERVAL_SEC * 2}초 대기 중...")
+    time.sleep(5)
+    logger.info(f"쿠폰 생성 후 5초 대기 중...")
 
-    # 쿠폰 생성 상태 폴링 (제네릭 헬퍼 함수 사용)
     coupon_id = _poll_status_for_requested_id(
         api_client_instance, 
         vendor_id, 
-        requested_id, 
-        MAX_STATUS_POLLING_ATTEMPTS, 
-        STATUS_POLLING_INTERVAL_SEC
+        requested_id
     )
     
     if coupon_id is None:
@@ -184,19 +222,16 @@ def _apply_coupon_with_retries(api_client_instance: CoupangApiClient, coupon_id:
     """
     for attempt_apply in range(MAX_APPLY_RETRIES):
         logger.info(f"쿠폰 {coupon_id} 품목 적용 시도 중... (시도 {attempt_apply + 1}/{MAX_APPLY_RETRIES})")
-        apply_requested_id = apply_coupon_to_items_request(coupon_id) # 래퍼 함수 호출
+        apply_requested_id = apply_coupon_to_items_request(coupon_id)
         
         if apply_requested_id:
-            # 쿠폰 적용 요청 상태 폴링 (제네릭 헬퍼 함수 사용)
             poll_result = _poll_status_for_requested_id(
                 api_client_instance, 
-                VENDOR_ID, # VENDOR_ID는 main.py의 전역 또는 config에서 가져옴
-                apply_requested_id, 
-                MAX_STATUS_POLLING_ATTEMPTS, 
-                STATUS_POLLING_INTERVAL_SEC
+                VENDOR_ID, 
+                apply_requested_id
             )
             
-            if poll_result is not None: # DONE 상태 (coupon_id가 반환됨)
+            if poll_result is not None:
                 logger.info("[성공] 쿠폰 적용 완료!")
                 return True
             else:
@@ -204,12 +239,12 @@ def _apply_coupon_with_retries(api_client_instance: CoupangApiClient, coupon_id:
         else:
             logger.warning(f"[실패] 쿠폰 {coupon_id} 품목 적용 요청 실패 또는 Requested ID를 받지 못했습니다.")
 
-        if (attempt_apply + 1) < MAX_APPLY_RETRIES: # 아직 성공 못했고 재시도 기회가 남았다면
+        if (attempt_apply + 1) < MAX_APPLY_RETRIES:
             logger.warning(f"[실패] 쿠폰 {coupon_id} 품목 적용 실패 (시도 {attempt_apply + 1}/{MAX_APPLY_RETRIES}). {APPLY_RETRY_DELAY_SEC}초 후 재시도...")
-            time.sleep(APPLY_RETRY_DELAY_SEC) # 재시도 전 딜레이
+            time.sleep(APPLY_RETRY_DELAY_SEC)
     
     logger.error(f"[오류] 쿠폰 {coupon_id} 품목 적용이 반복 실패하여 다음 사이클까지 기다립니다.")
-    return False # 최종 적용 실패
+    return False
 
 
 # 메인 쿠폰 자동화 사이클 함수
@@ -220,62 +255,49 @@ def run_coupon_cycle():
     최종 성공 또는 실패 여부를 Discord 알림으로 보냅니다.
     """
     logger.info("\n--- 쿠폰 자동화: 새로운 쿠폰 갱신 사이클 시작 ---")
-    cycle_success = True  # 사이클 전체 성공 여부 플래그
+    
     notification_message = ""
-    notification_subject = "쿠폰 자동화 스크립트 알림"
+    notification_subject_prefix = "쿠폰 자동화 스크립트" # 제목 접두사
 
     try:
         if not VENDOR_ITEMS:
             notification_message = "[경고] VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜁니다."
             logger.warning(notification_message)
-            cycle_success = False
-            return # 함수 종료 (finally 블록에서 알림 처리)
+            send_discord_failure_notification(notification_message, f"{notification_subject_prefix} (실패)")
+            return 
 
-        # 1. 기존 쿠폰 비활성화 단계 처리
         if not _handle_deactivation_phase(api_client, VENDOR_ID):
             notification_message = "[오류] 기존 쿠폰 비활성화 단계 실패. 다음 단계로 진행하지 않습니다."
             logger.error(notification_message)
-            cycle_success = False
+            send_discord_failure_notification(notification_message, f"{notification_subject_prefix} (실패)")
             return
 
-        # 2. 새 쿠폰 생성 및 상태 확인 단계 처리
         coupon_id = _create_and_poll_coupon(api_client, VENDOR_ID)
         if not coupon_id:
             notification_message = "[오류] 새 쿠폰 생성 단계 실패. 다음 단계로 진행하지 않습니다."
             logger.error(notification_message)
-            cycle_success = False
+            send_discord_failure_notification(notification_message, f"{notification_subject_prefix} (실패)")
             return
 
-        # 쿠폰 상태 반영 후 적용 전 대기
-        time.sleep(STATUS_POLLING_INTERVAL_SEC)
-        logger.info(f"쿠폰 상태 확인 후 {STATUS_POLLING_INTERVAL_SEC}초 대기 중...")
+        time.sleep(5)
+        logger.info(f"쿠폰 상태 확인 후 5초 대기 중...")
 
-        # 3. 쿠폰 품목 적용 단계 처리
         if not _apply_coupon_with_retries(api_client, coupon_id, VENDOR_ITEMS):
             notification_message = "[오류] 쿠폰 품목 적용 단계 실패."
             logger.error(notification_message)
-            cycle_success = False
+            send_discord_failure_notification(notification_message, f"{notification_subject_prefix} (실패)")
             return
 
-        # 모든 단계 성공 시
         notification_message = "쿠폰 자동화 사이클이 성공적으로 완료되었습니다."
         logger.info("--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 (성공) ---")
-        cycle_success = True # 명시적으로 성공 상태 설정
+        send_discord_success_notification(notification_message, f"{notification_subject_prefix} (성공)")
 
     except Exception as e:
-        # 예상치 못한 다른 모든 오류 처리
         error_details = traceback.format_exc()
         notification_message = f"[치명적 오류] 쿠폰 자동화 사이클 실행 중 예상치 못한 오류 발생: {e}\n\n상세 정보:\n```{error_details}```"
-        notification_subject = "긴급 알림: 쿠폰 자동화 스크립트 치명적 오류"
+        critical_subject = f"긴급 알림: {notification_subject_prefix} 치명적 오류"
         logger.critical(notification_message)
-        cycle_success = False
-
-    finally:
-        # 최종 성공/실패 여부에 따라 Discord 알림 전송
-        if cycle_success:
-            send_discord_notification(notification_message, f"{notification_subject} (성공)")
-        else:
-            send_discord_notification(notification_message, f"{notification_subject} (실패) @everyone")
+        send_discord_failure_notification(notification_message, critical_subject)
 
 
 # 자동 실행 설정
