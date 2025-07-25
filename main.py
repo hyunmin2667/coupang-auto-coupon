@@ -262,7 +262,7 @@ def run_coupon_cycle():
     notification_subject_prefix = "쿠폰 자동화 스크립트" # 제목 접두사
 
     try:
-        discord_update_message = check_for_git_updates(logger)
+        discord_update_message = check_for_git_updates()
 
         if not VENDOR_ITEMS:
             notification_message = "[경고] VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜁니다."
