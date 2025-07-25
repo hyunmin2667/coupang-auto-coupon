@@ -4,13 +4,14 @@ import schedule
 from typing import Callable, Any, Tuple
 import traceback
 
+
 from coupang_lib.config import VENDOR_ID, COUPON_CYCLE_MINUTES, API_GATEWAY_URL, ACCESS_KEY, SECRET_KEY
 from coupang_lib.api_client import CoupangApiClient
 from coupang_lib.coupang_api_utils import create_new_coupon_util, check_coupon_status_util, apply_coupon_to_items_util, get_active_coupons_by_keyword, deactivate_coupon
 from coupang_lib.item_loader import load_vendor_items_from_csv
 from coupang_lib.logger import logger
 from coupang_lib.discord_notifier import send_discord_success_notification, send_discord_failure_notification
-
+from coupang_lib.git_utils import check_for_git_updates
 
 # --- 설정 가능한 상수 정의 (config.config.py로 이동을 고려) ---
 MAX_DEACTIVATION_RETRIES = 3
@@ -261,6 +262,8 @@ def run_coupon_cycle():
     notification_subject_prefix = "쿠폰 자동화 스크립트" # 제목 접두사
 
     try:
+        discord_update_message = check_for_git_updates(logger)
+
         if not VENDOR_ITEMS:
             notification_message = "[경고] VENDOR_ITEMS가 로드되지 않아 쿠폰 생성 및 적용을 건너뜁니다."
             logger.warning(notification_message)
@@ -294,9 +297,8 @@ def run_coupon_cycle():
 
         notification_message = f"쿠폰 자동화 사이클이 성공적으로 완료되었습니다. 다음 실행 예정: {next_run_time_str}"
 
-        logger.info(notification_message)
-        logger.info("--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 (성공) ---")
-        send_discord_success_notification(notification_message, f"{notification_subject_prefix} (성공)")
+        send_discord_success_notification(notification_message + discord_update_message, f"{notification_subject_prefix} (성공)")
+        logger.info(f"--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 (성공) --- {notification_message}")
 
     except Exception as e:
         error_details = traceback.format_exc()
