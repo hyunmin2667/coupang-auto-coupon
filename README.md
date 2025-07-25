@@ -193,8 +193,3 @@ cd coupang-auto-coupon
     └── coupang_automation.log
 ```
 
-
-
-
-
-
