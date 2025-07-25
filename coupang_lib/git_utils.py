@@ -101,9 +101,6 @@ def check_for_git_updates() -> str:
     return discord_update_message
 
 if __name__ == "__main__":
-    from coupang_lib.logger import logger as main_logger
-    main_logger.setLevel(logging.DEBUG)
-    
     print("--- 업데이트 유틸리티 테스트 시작 (디버그 로그 출력) ---")
     message = check_for_git_updates()
     print("\n--- 생성된 Discord 메시지 미리보기 (간결한 사용자 메시지) ---")
