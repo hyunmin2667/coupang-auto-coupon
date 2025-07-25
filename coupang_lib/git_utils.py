@@ -11,13 +11,20 @@ def _run_git_command(command: list[str], logger: logging.Logger) -> str | None:
             command,
             capture_output=True,
             text=True,
-            check=True,
+            check=True, # 이 부분이 오류 발생 시 CalledProcessError를 발생시킵니다.
             encoding='utf-8'
         )
+        # Git fetch 같은 명령은 stdout이 비어있을 수 있으므로, stderr도 함께 로깅하여 정보 확인
+        if result.stderr:
+            logger.debug(f"Git 명령어 표준 에러 출력 (경고/정보): {' '.join(command)} -> {result.stderr.strip()}")
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         logger.error(f"Git 명령어 실행 오류: {' '.join(command)}")
         logger.error(f"오류 코드: {e.returncode}, 표준 출력: {e.stdout.strip()}, 표준 에러: {e.stderr.strip()}")
+        # 오류 발생 시 stderr 내용을 Discord 메시지에 포함할 수 있도록 반환하지 않고 로깅만 합니다.
+        return None
+    except FileNotFoundError:
+        logger.error(f"Git 명령어를 찾을 수 없습니다. Git이 설치되어 있고 PATH에 추가되었는지 확인하세요.")
         return None
     except Exception as e:
         logger.error(f"알 수 없는 오류로 Git 명령어 실행 실패: {e}")
@@ -29,18 +36,22 @@ def check_for_git_updates(logger: logging.Logger) -> str:
     """
     logger.info("Git 원격 저장소 업데이트 확인 중...")
     
-    # Discord 메시지 초기화
     discord_update_message = ""
-    program_output_lines = [] # 프로그램처럼 보일 출력 라인들을 저장할 리스트
+    program_output_lines = []
 
     # 1. git fetch 실행하여 원격 최신 정보 가져오기
-    fetch_result = _run_git_command(["git", "fetch", "origin"], logger)
-    if fetch_result:
+    fetch_success = True # fetch 성공 여부를 추적할 플래그
+    fetch_output = _run_git_command(["git", "fetch", "origin"], logger)
+    
+    if fetch_output is None: # _run_git_command에서 오류가 발생했을 경우 (CalledProcessError 등)
+        fetch_success = False
+        program_output_lines.append("[!] Git fetch 실패: 저장소 접근 또는 네트워크 문제로 최신 정보를 가져올 수 없습니다.")
+        logger.warning("Git fetch 실행 중 치명적인 문제가 발생했습니다. 업데이트 확인이 정확하지 않을 수 있습니다.")
+    elif fetch_output: # fetch 결과가 있고 내용이 있을 경우 (예: "remote: Enumerating objects...")
         logger.info(f"Git fetch 완료.")
-    else:
-        logger.warning("Git fetch 실행 중 문제가 발생했거나 네트워크 오류가 발생했습니다. 업데이트 확인이 정확하지 않을 수 있습니다.")
-        program_output_lines.append("[!] Git 업데이트 확인 중 오류 발생: 네트워크 문제 또는 저장소 접근 불가")
-        # fetch 실패 시에도 업데이트 목록 확인은 시도할 수 있도록 함
+        # fetch_output 자체는 디스코드 메시지에 포함하지 않고, 성공만 알림
+    else: # fetch 결과는 있지만 변경사항이 없어 빈 문자열일 경우 (가장 일반적인 성공 케이스)
+        logger.info("Git fetch 완료 (변경 사항 없음).")
 
     # 2. 현재 브랜치 이름 가져오기
     current_branch = _run_git_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], logger)
@@ -50,28 +61,28 @@ def check_for_git_updates(logger: logging.Logger) -> str:
     
     program_output_lines.append(f"[INFO] 현재 작업 브랜치: {current_branch}")
 
-    # 3. 로컬 브랜치와 원격 브랜치 비교하여 업데이트 내역 가져오기
-    # `--pretty=format:%s`를 사용하여 커밋 메시지 제목만 가져오고, `--abbrev-commit`으로 짧은 해시 사용
-    update_log_command = ["git", "log", f"HEAD..origin/{current_branch}", "--pretty=format:• %s (ID: %h)", "--no-merges"]
-    raw_update_list = _run_git_command(update_log_command, logger)
+    # Git fetch가 성공했을 때만 업데이트 목록 확인 시도
+    if fetch_success:
+        # 3. 로컬 브랜치와 원격 브랜치 비교하여 업데이트 내역 가져오기
+        update_log_command = ["git", "log", f"HEAD..origin/{current_branch}", "--pretty=format:• %s (ID: %h)", "--no-merges"]
+        raw_update_list = _run_git_command(update_log_command, logger)
 
-    if raw_update_list:
-        update_commits = raw_update_list.split('\n')
-        num_updates = len(update_commits)
-        
-        program_output_lines.append(f"[SUCCESS] 새로운 업데이트 {num_updates}개 발견!")
-        program_output_lines.append("--- 업데이트 내용 ---")
-        program_output_lines.extend(update_commits) # 각 커밋 메시지를 라인별로 추가
-        program_output_lines.append("---------------------")
-        
-        # Discord 메시지용 문자열 구성 (코드 블록 안에 넣어 가독성 높임)
-        discord_update_message = "\n\n**[프로그램 업데이트 확인]**\n```\n" + "\n".join(program_output_lines) + "\n```"
-        logger.info("\n" + "\n".join(program_output_lines)) # 로깅에도 깔끔한 프로그램 출력 추가
-
+        if raw_update_list:
+            update_commits = raw_update_list.split('\n')
+            num_updates = len(update_commits)
+            
+            program_output_lines.append(f"[SUCCESS] 새로운 업데이트 {num_updates}개 발견!")
+            program_output_lines.append("--- 업데이트 내용 ---")
+            program_output_lines.extend(update_commits)
+            program_output_lines.append("---------------------")
+        else:
+            program_output_lines.append("[INFO] 새로운 업데이트가 없습니다. 현재 최신 버전입니다.")
     else:
-        program_output_lines.append("[INFO] 새로운 업데이트가 없습니다. 현재 최신 버전입니다.")
-        discord_update_message = "\n\n**[프로그램 업데이트 확인]**\n```\n" + "\n".join(program_output_lines) + "\n```"
-        logger.info("\n" + "\n".join(program_output_lines))
+        # fetch 실패 시에는 업데이트 목록을 확인할 수 없음을 명확히 알림
+        program_output_lines.append("[WARNING] Git fetch 실패로 인해 업데이트 목록을 확인할 수 없습니다.")
+
+    discord_update_message = "\n\n**[프로그램 업데이트 확인]**\n```\n" + "\n".join(program_output_lines) + "\n```"
+    logger.info("\n" + "\n".join(program_output_lines))
 
     return discord_update_message
 
