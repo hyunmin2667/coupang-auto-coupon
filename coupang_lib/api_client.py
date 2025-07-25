@@ -64,7 +64,7 @@ class CoupangApiClient:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
             
-            with urllib.request.urlopen(req, context=ctx) as resp:
+            with urllib.request.urlopen(req, context=ctx, timeout=60) as resp:
                 raw_response_bytes = resp.read()
                 charset = resp.headers.get_content_charset() or 'utf-8'
                 
