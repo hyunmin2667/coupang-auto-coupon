@@ -69,6 +69,7 @@ cd coupang-auto-coupon
     (위 `3단계`에서 만든 `2.설정편집` 바로가기를 더블클릭하면 `.env` 파일을 바로 열 수 있습니다.)
 2.  새로 만든 `.env` 파일을 '메모장'이나 '텍스트 편집기'로 열어보세요.
 3.  파일 안에 `"your_..."`이라고 표시된 부분들을 **당신의 실제 정보로 반드시 수정**해야 합니다. (예시: `COUPANG_ID="내_쿠팡_아이디"`)
+4.  [디스코드 웹훅 URL으로 알림받는 방법 보기 (클릭)](https://www.svix.com/resources/guides/how-to-make-webhook-discord/)
 
     ```dotenv
     # 쿠폰 할인율 (예: 50% 할인)
