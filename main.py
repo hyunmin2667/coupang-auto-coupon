@@ -1,3 +1,4 @@
+from datetime import datetime
 import time
 import schedule
 from typing import Callable, Any, Tuple
@@ -287,6 +288,11 @@ def run_coupon_cycle():
             logger.error(notification_message)
             send_discord_failure_notification(notification_message, f"{notification_subject_prefix} (실패)")
             return
+        
+        next_run_time = datetime.datetime.now() + datetime.timedelta(minutes=COUPON_CYCLE_MINUTES)
+        next_run_time_str = next_run_time.strftime('%Y년 %m월 %d일 %H시 %M분')
+
+        notification_message = f"쿠폰 자동화 사이클이 성공적으로 완료되었습니다. 다음 실행 예정: {next_run_time_str}"
 
         notification_message = "쿠폰 자동화 사이클이 성공적으로 완료되었습니다."
         logger.info("--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 (성공) ---")
