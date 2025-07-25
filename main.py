@@ -294,7 +294,7 @@ def run_coupon_cycle():
 
         notification_message = f"쿠폰 자동화 사이클이 성공적으로 완료되었습니다. 다음 실행 예정: {next_run_time_str}"
 
-        notification_message = "쿠폰 자동화 사이클이 성공적으로 완료되었습니다."
+        logger.info(notification_message)
         logger.info("--- 쿠폰 자동화: 쿠폰 갱신 사이클 종료 (성공) ---")
         send_discord_success_notification(notification_message, f"{notification_subject_prefix} (성공)")
 
